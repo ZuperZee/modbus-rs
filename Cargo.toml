@@ -9,11 +9,3 @@ edition = "2021"
 
 [features]
 alloc = []
-
-[[example]]
-name = "tcp-client"
-path = "examples/tcp-client.rs"
-
-[[example]]
-name = "tcp-client-framed"
-path = "examples/tcp-client-framed.rs"
