@@ -7,7 +7,7 @@ use std::{
 use modbus::{
     adu::tcp::{request::Request as AduRequest, response::Response as AduResponse},
     error::Error,
-    pdu::{request::Request as PduRequest, response::Response as PduResponse, words::Words},
+    pdu::{request::Request as PduRequest, response::Response as PduResponse, DataWords},
 };
 
 fn main() {
@@ -59,7 +59,7 @@ fn handle_connection(mut stream: TcpStream) {
             PduRequest::ReadCoils(_, _) => todo!(),
             PduRequest::ReadDiscreteInput(_, _) => todo!(),
             PduRequest::ReadHoldingRegisters(_, _) => todo!(),
-            PduRequest::ReadInputRegisters(_, _) => PduResponse::ReadInputRegisters(Words {
+            PduRequest::ReadInputRegisters(_, _) => PduResponse::ReadInputRegisters(DataWords {
                 data: &[0x01, 0x02],
                 quantity: 1,
             }),

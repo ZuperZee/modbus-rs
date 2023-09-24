@@ -60,7 +60,7 @@ impl<'a> Response<'a> {
 
 #[cfg(test)]
 mod test {
-    use crate::pdu::words::Words;
+    use crate::pdu::DataWords;
 
     use super::{Header, PduResponse, Response};
 
@@ -76,7 +76,7 @@ mod test {
                     length: 13,
                     unit_id: 1,
                 },
-                pdu: PduResponse::ReadInputRegisters(Words {
+                pdu: PduResponse::ReadInputRegisters(DataWords {
                     data: &[0, 1, 0, 2, 0, 3, 0, 4, 0, 5],
                     quantity: 5
                 })
@@ -93,7 +93,7 @@ mod test {
                 length: 13,
                 unit_id: 1,
             },
-            pdu: PduResponse::ReadInputRegisters(Words {
+            pdu: PduResponse::ReadInputRegisters(DataWords {
                 data: &[0, 1, 0, 2, 0, 3, 0, 4, 0, 5],
                 quantity: 5,
             }),

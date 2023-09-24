@@ -1,22 +1,21 @@
 use crate::{error::Error, exception_code::ExceptionCode};
 
 use super::{
-    coil_to_u16_coil, coils::Coils, function_code::FunctionCode, words::Words, Address, Coil,
-    Quantity, Word,
+    coil_to_u16_coil, function_code::FunctionCode, Address, DataCoils, DataWords, Quantity,
 };
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Response<'a> {
-    ReadCoils(Coils<'a>),
-    ReadDiscreteInput(Coils<'a>),
-    ReadHoldingRegisters(Words<'a>),
-    ReadInputRegisters(Words<'a>),
-    WriteSingleCoil(Address, Coil),
-    WriteSingleRegister(Address, Word),
+    ReadCoils(DataCoils<'a>),
+    ReadDiscreteInput(DataCoils<'a>),
+    ReadHoldingRegisters(DataWords<'a>),
+    ReadInputRegisters(DataWords<'a>),
+    WriteSingleCoil(Address, bool),
+    WriteSingleRegister(Address, u16),
     WriteMultipleCoils(Address, Quantity),
     WriteMultipleRegisters(Address, Quantity),
-    MaskWriteRegister(Address, Word, Word),
-    ReadWriteMultipleRegisters(Words<'a>),
+    MaskWriteRegister(Address, u16, u16),
+    ReadWriteMultipleRegisters(DataWords<'a>),
     Custom(FunctionCode, &'a [u8]),
 }
 
@@ -33,7 +32,7 @@ impl<'a> TryFrom<&'a [u8]> for Response<'a> {
         let response = match fn_code {
             FunctionCode::ReadCoils | FunctionCode::ReadDiscreteInput => {
                 let Some(byte_count) = buf.get(1).map(|&v| v as usize) else {
-                    return Err(Error::IncompleteBuffer)
+                    return Err(Error::IncompleteBuffer);
                 };
                 if byte_count + 2 > buf.len() {
                     return Err(Error::IncompleteBuffer);
@@ -41,9 +40,9 @@ impl<'a> TryFrom<&'a [u8]> for Response<'a> {
                 let data = &buf[2..byte_count + 2];
                 let quantity = byte_count * 8;
                 match fn_code {
-                    FunctionCode::ReadCoils => Response::ReadCoils(Coils { data, quantity }),
+                    FunctionCode::ReadCoils => Response::ReadCoils(DataCoils { data, quantity }),
                     FunctionCode::ReadDiscreteInput => {
-                        Response::ReadDiscreteInput(Coils { data, quantity })
+                        Response::ReadDiscreteInput(DataCoils { data, quantity })
                     }
                     _ => unreachable!(),
                 }
@@ -52,7 +51,7 @@ impl<'a> TryFrom<&'a [u8]> for Response<'a> {
             | FunctionCode::ReadInputRegisters
             | FunctionCode::ReadWriteMultipleRegisters => {
                 let Some(byte_count) = buf.get(1).map(|&v| v as usize) else {
-                    return Err(Error::IncompleteBuffer)
+                    return Err(Error::IncompleteBuffer);
                 };
                 if byte_count + 2 > buf.len() {
                     return Err(Error::IncompleteBuffer);
@@ -61,13 +60,13 @@ impl<'a> TryFrom<&'a [u8]> for Response<'a> {
                 let quantity = byte_count / 2;
                 match fn_code {
                     FunctionCode::ReadHoldingRegisters => {
-                        Response::ReadHoldingRegisters(Words { data, quantity })
+                        Response::ReadHoldingRegisters(DataWords { data, quantity })
                     }
                     FunctionCode::ReadInputRegisters => {
-                        Response::ReadInputRegisters(Words { data, quantity })
+                        Response::ReadInputRegisters(DataWords { data, quantity })
                     }
                     FunctionCode::ReadWriteMultipleRegisters => {
-                        Response::ReadWriteMultipleRegisters(Words { data, quantity })
+                        Response::ReadWriteMultipleRegisters(DataWords { data, quantity })
                     }
                     _ => unreachable!(),
                 }
@@ -187,9 +186,9 @@ impl<'a> Response<'a> {
 
 #[cfg(test)]
 mod test {
-    use crate::pdu::words::Words;
+    use crate::pdu::DataWords;
 
-    use super::{Coils, Error, Response};
+    use super::{DataCoils, Error, Response};
 
     #[test]
     fn response_from_buffer() {
@@ -210,7 +209,7 @@ mod test {
         let buf: &[u8] = &[0x01, 0x02, 0xff, 0x7f];
         assert_eq!(
             Response::try_from(buf),
-            Ok(Response::ReadCoils(Coils {
+            Ok(Response::ReadCoils(DataCoils {
                 data: &[0xff, 0x7f],
                 quantity: 16
             }))
@@ -218,7 +217,7 @@ mod test {
         let buf: &[u8] = &[0x02, 0x02, 0xff, 0x7f];
         assert_eq!(
             Response::try_from(buf),
-            Ok(Response::ReadDiscreteInput(Coils {
+            Ok(Response::ReadDiscreteInput(DataCoils {
                 data: &[0xff, 0x7f],
                 quantity: 16
             }))
@@ -226,7 +225,7 @@ mod test {
         let buf: &[u8] = &[0x03, 0x04, 0x00, 0x11, 0x00, 0x04];
         assert_eq!(
             Response::try_from(buf),
-            Ok(Response::ReadHoldingRegisters(Words {
+            Ok(Response::ReadHoldingRegisters(DataWords {
                 data: &[0x00, 0x11, 0x00, 0x04],
                 quantity: 2
             }))
@@ -234,7 +233,7 @@ mod test {
         let buf: &[u8] = &[0x04, 0x04, 0x00, 0x11, 0x00, 0x04];
         assert_eq!(
             Response::try_from(buf),
-            Ok(Response::ReadInputRegisters(Words {
+            Ok(Response::ReadInputRegisters(DataWords {
                 data: &[0x00, 0x11, 0x00, 0x04],
                 quantity: 2
             }))
@@ -261,7 +260,7 @@ mod test {
 
     #[test]
     fn buffer_from_response() {
-        let res = Response::ReadCoils(Coils {
+        let res = Response::ReadCoils(DataCoils {
             data: &[0xff, 0x7f],
             quantity: 16,
         });
@@ -276,7 +275,7 @@ mod test {
     fn vec_buffer_from_response() {
         extern crate alloc;
         use alloc::vec;
-        let res = Response::ReadCoils(Coils {
+        let res = Response::ReadCoils(DataCoils {
             data: &[0xff, 0x7f],
             quantity: 16,
         });

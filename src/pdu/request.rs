@@ -1,8 +1,8 @@
 use crate::{error::Error, exception_code::ExceptionCode};
 
 use super::{
-    coil_to_u16_coil, coils::Coils, function_code::FunctionCode, u16_coil_to_coil, words::Words,
-    Address, Coil, Quantity, Word,
+    coil_to_u16_coil, DataCoils, function_code::FunctionCode, u16_coil_to_coil, DataWords,
+    Address, Quantity,
 };
 
 #[derive(Debug, PartialEq, Eq)]
@@ -11,12 +11,12 @@ pub enum Request<'a> {
     ReadDiscreteInput(Address, Quantity),
     ReadHoldingRegisters(Address, Quantity),
     ReadInputRegisters(Address, Quantity),
-    WriteSingleCoil(Address, Coil),
-    WriteSingleRegister(Address, Word),
-    WriteMultipleCoils(Address, Coils<'a>),
-    WriteMultipleRegisters(Address, Words<'a>),
-    MaskWriteRegister(Address, Word, Word),
-    ReadWriteMultipleRegisters(Address, Quantity, Address, Words<'a>),
+    WriteSingleCoil(Address, bool),
+    WriteSingleRegister(Address, u16),
+    WriteMultipleCoils(Address, DataCoils<'a>),
+    WriteMultipleRegisters(Address, DataWords<'a>),
+    MaskWriteRegister(Address, u16, u16),
+    ReadWriteMultipleRegisters(Address, Quantity, Address, DataWords<'a>),
     Custom(FunctionCode, &'a [u8]),
 }
 
@@ -104,7 +104,7 @@ impl<'a> TryFrom<&'a [u8]> for Request<'a> {
                 let data = &buf[6..byte_count + 6];
                 Request::WriteMultipleCoils(
                     address,
-                    Coils {
+                    DataCoils {
                         data,
                         quantity: quantity as usize,
                     },
@@ -126,7 +126,7 @@ impl<'a> TryFrom<&'a [u8]> for Request<'a> {
                 let data = &buf[6..byte_count + 6];
                 Request::WriteMultipleRegisters(
                     address,
-                    Words {
+                    DataWords {
                         data,
                         quantity: quantity as usize,
                     },
@@ -164,7 +164,7 @@ impl<'a> TryFrom<&'a [u8]> for Request<'a> {
                     read_address,
                     read_quantity,
                     write_address,
-                    Words {
+                    DataWords {
                         data,
                         quantity: write_quantity as usize,
                     },
@@ -258,7 +258,7 @@ impl<'a> Request<'a> {
 
 #[cfg(test)]
 mod test {
-    use crate::{exception_code::ExceptionCode, pdu::coils::Coils};
+    use crate::{exception_code::ExceptionCode, pdu::DataCoils};
 
     use super::{Error, Request};
 
@@ -291,7 +291,7 @@ mod test {
             Request::try_from(buf),
             Ok(Request::WriteMultipleCoils(
                 0x13,
-                Coils {
+                DataCoils {
                     data: &[0xcd, 0x01],
                     quantity: 0x0a
                 }
