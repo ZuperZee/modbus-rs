@@ -48,8 +48,6 @@ impl<'a, 'b> DataCoils<'a> {
 #[cfg(feature = "alloc")]
 extern crate alloc;
 #[cfg(feature = "alloc")]
-extern crate std;
-#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 #[cfg(feature = "alloc")]
 impl From<DataCoils<'_>> for Vec<bool> {
