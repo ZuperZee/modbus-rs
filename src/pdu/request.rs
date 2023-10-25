@@ -1,8 +1,8 @@
 use crate::{error::Error, exception_code::ExceptionCode};
 
 use super::{
-    coil_to_u16_coil, DataCoils, function_code::FunctionCode, u16_coil_to_coil, DataWords,
-    Address, Quantity,
+    coil_to_u16_coil, function_code::FunctionCode, u16_coil_to_coil, Address, DataCoils, DataWords,
+    Quantity,
 };
 
 #[derive(Debug, PartialEq, Eq)]
