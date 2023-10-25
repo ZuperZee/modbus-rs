@@ -13,7 +13,7 @@ impl<'a, 'b> DataCoils<'a> {
         for (i, bits) in coils.chunks(8).enumerate() {
             let mut byte: u8 = 0;
             for (j, &bit) in bits.iter().enumerate() {
-                byte |= (bit as u8) << (7 - (j % 8));
+                byte |= (bit as u8) << j;
             }
             buf[i] = byte;
         }
@@ -68,8 +68,8 @@ pub mod test {
     fn data_coils_from_coils() {
         let mut buf = [0_u8; 20];
         let coils = &[
-            true, true, true, true, true, true, true, true, false, false, false, false, true,
-            false, false, true, false, true,
+            true, true, true, true, true, true, true, true, true, false, false, true, false, false,
+            false, false, false, false, false, false, false, false, true,
         ];
         let data_coils = DataCoils::from_coils(coils, &mut buf);
 
@@ -77,9 +77,21 @@ pub mod test {
             data_coils,
             DataCoils {
                 data: &[255, 9, 64],
-                quantity: 18
+                quantity: 23
             }
-        )
+        );
+
+        let mut buf = [0_u8; 20];
+        let coils = &[true, false];
+        let data_coils = DataCoils::from_coils(coils, &mut buf);
+
+        assert_eq!(
+            data_coils,
+            DataCoils {
+                data: &[1],
+                quantity: 2
+            }
+        );
     }
 
     #[test]
