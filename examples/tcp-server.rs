@@ -69,7 +69,7 @@ fn handle_connection(mut stream: TcpStream) {
             }
         };
 
-        let res = AduResponse::new(req.header.transaction_id, req.header.unit_id, pdu_res);
+        let res = AduResponse::new(req.header.transaction_id, req.header.unit_id, Ok(pdu_res));
         let mut res_buf = vec![0; res.adu_len()];
         let size = res.encode(&mut res_buf);
 

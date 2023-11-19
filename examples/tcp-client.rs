@@ -15,7 +15,8 @@ fn main() {
     stream
         .set_read_timeout(Some(Duration::from_secs(5)))
         .unwrap();
-    let pdu_req = PduRequest::ReadInputRegisters(0, 0x7d);
+    // let pdu_req = PduRequest::Custom(modbus::pdu::function_code::FunctionCode::Custom(0x80), &[0, 0, 0, 0]);
+    let pdu_req = PduRequest::ReadHoldingRegisters(500, 1);
     let req = AduRequest::new(1, 1, pdu_req);
     let mut req_buf = vec![0_u8; req.adu_len()];
     req.encode(&mut req_buf).unwrap();
