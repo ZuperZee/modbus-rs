@@ -1,4 +1,5 @@
 pub mod coil;
+pub mod exception_response;
 pub mod function_code;
 pub mod request;
 pub mod response;

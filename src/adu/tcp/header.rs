@@ -12,8 +12,11 @@ impl<'a> TryFrom<&'a [u8]> for Header {
     type Error = Error;
 
     fn try_from(buf: &'a [u8]) -> Result<Self, Self::Error> {
-        if buf.len() < 7 {
-            return Err(Error::IncompleteBuffer);
+        if buf.len() < Header::size() {
+            return Err(Error::IncompleteBuffer {
+                current_size: buf.len(),
+                min_needed_size: Header::size(),
+            });
         };
 
         let transaction_id = u16::from_be_bytes([buf[0], buf[1]]);
@@ -39,12 +42,12 @@ impl Header {
             unit_id,
         }
     }
-    pub fn size(&self) -> usize {
+    pub const fn size() -> usize {
         7
     }
 
     pub fn encode(&self, buf: &mut [u8]) -> Result<usize, Error> {
-        if self.size() > buf.len() {
+        if Self::size() > buf.len() {
             return Err(Error::InvalidBufferSize);
         }
 
@@ -53,6 +56,6 @@ impl Header {
         buf[4..6].copy_from_slice(&self.length.to_be_bytes());
         buf[6] = self.unit_id;
 
-        Ok(self.size())
+        Ok(Self::size())
     }
 }

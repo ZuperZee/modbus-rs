@@ -1,4 +1,7 @@
-use crate::{error::Error, exception_code::ExceptionCode};
+use crate::{
+    error::{Error, ExceptionError},
+    exception_code::ExceptionCode,
+};
 
 use super::{
     coil_to_u16_coil, function_code::FunctionCode, u16_coil_to_coil, Address, DataCoils, DataWords,
@@ -27,7 +30,20 @@ impl<'a> TryFrom<&'a [u8]> for Request<'a> {
         if buf.is_empty() {
             return Err(Error::EmptyBuffer);
         }
-        let fn_code: FunctionCode = buf[0].try_into()?;
+
+        let fn_code: FunctionCode = buf[0].try_into().map_err(|c| {
+            if buf.len() > 1 {
+                Error::ModbusExceptionCode(
+                    FunctionCode::try_from(c & 0x7f).unwrap(),
+                    ExceptionCode::try_from(buf[1]),
+                )
+            } else {
+                Error::IncompleteBuffer {
+                    current_size: 1,
+                    min_needed_size: 2,
+                }
+            }
+        })?;
 
         let request = match fn_code {
             FunctionCode::ReadCoils
@@ -35,7 +51,10 @@ impl<'a> TryFrom<&'a [u8]> for Request<'a> {
             | FunctionCode::ReadHoldingRegisters
             | FunctionCode::ReadInputRegisters => {
                 if 5 > buf.len() {
-                    return Err(Error::IncompleteBuffer);
+                    return Err(Error::IncompleteBuffer {
+                        current_size: buf.len(),
+                        min_needed_size: 5,
+                    });
                 }
                 let address = u16::from_be_bytes(buf[1..3].try_into().unwrap());
                 let quantity = u16::from_be_bytes(buf[3..5].try_into().unwrap());
@@ -43,25 +62,37 @@ impl<'a> TryFrom<&'a [u8]> for Request<'a> {
                 match fn_code {
                     FunctionCode::ReadCoils => {
                         if quantity == 0 || quantity > 0x07d0 {
-                            return Err(Error::ExceptionCode(ExceptionCode::IllegalDataValue));
+                            return Err(Error::ModbusExceptionError(
+                                fn_code,
+                                ExceptionError::IllegalDataValue,
+                            ));
                         }
                         Request::ReadCoils(address, quantity)
                     }
                     FunctionCode::ReadDiscreteInput => {
                         if quantity == 0 || quantity > 0x07d0 {
-                            return Err(Error::ExceptionCode(ExceptionCode::IllegalDataValue));
+                            return Err(Error::ModbusExceptionError(
+                                fn_code,
+                                ExceptionError::IllegalDataValue,
+                            ));
                         }
                         Request::ReadDiscreteInput(address, quantity)
                     }
                     FunctionCode::ReadHoldingRegisters => {
                         if quantity == 0 || quantity > 0x7d {
-                            return Err(Error::ExceptionCode(ExceptionCode::IllegalDataValue));
+                            return Err(Error::ModbusExceptionError(
+                                fn_code,
+                                ExceptionError::IllegalDataValue,
+                            ));
                         }
                         Request::ReadHoldingRegisters(address, quantity)
                     }
                     FunctionCode::ReadInputRegisters => {
                         if quantity == 0 || quantity > 0x7d {
-                            return Err(Error::ExceptionCode(ExceptionCode::IllegalDataValue));
+                            return Err(Error::ModbusExceptionError(
+                                fn_code,
+                                ExceptionError::IllegalDataValue,
+                            ));
                         }
                         Request::ReadInputRegisters(address, quantity)
                     }
@@ -70,7 +101,10 @@ impl<'a> TryFrom<&'a [u8]> for Request<'a> {
             }
             FunctionCode::WriteSingleCoil | FunctionCode::WriteSingleRegister => {
                 if 5 > buf.len() {
-                    return Err(Error::IncompleteBuffer);
+                    return Err(Error::IncompleteBuffer {
+                        current_size: buf.len(),
+                        min_needed_size: 5,
+                    });
                 }
                 let address = u16::from_be_bytes(buf[1..3].try_into().unwrap());
                 let value = u16::from_be_bytes(buf[3..5].try_into().unwrap());
@@ -78,7 +112,10 @@ impl<'a> TryFrom<&'a [u8]> for Request<'a> {
                 match fn_code {
                     FunctionCode::WriteSingleCoil => {
                         let Some(coil_bool) = u16_coil_to_coil(value) else {
-                            return Err(Error::ExceptionCode(ExceptionCode::IllegalDataValue));
+                            return Err(Error::ModbusExceptionError(
+                                fn_code,
+                                ExceptionError::IllegalDataValue,
+                            ));
                         };
                         Request::WriteSingleCoil(address, coil_bool)
                     }
@@ -90,16 +127,25 @@ impl<'a> TryFrom<&'a [u8]> for Request<'a> {
             }
             FunctionCode::WriteMultipleCoils => {
                 if 6 > buf.len() {
-                    return Err(Error::IncompleteBuffer);
+                    return Err(Error::IncompleteBuffer {
+                        current_size: buf.len(),
+                        min_needed_size: 6,
+                    });
                 }
                 let address = u16::from_be_bytes(buf[1..3].try_into().unwrap());
                 let quantity = u16::from_be_bytes(buf[3..5].try_into().unwrap());
                 if quantity == 0 || quantity > 0x07b0 {
-                    return Err(Error::ExceptionCode(ExceptionCode::IllegalDataValue));
+                    return Err(Error::ModbusExceptionError(
+                        fn_code,
+                        ExceptionError::IllegalDataValue,
+                    ));
                 }
                 let byte_count = buf[5] as usize;
                 if byte_count + 6 > buf.len() {
-                    return Err(Error::IncompleteBuffer);
+                    return Err(Error::IncompleteBuffer {
+                        current_size: buf.len(),
+                        min_needed_size: byte_count + 6,
+                    });
                 }
                 let data = &buf[6..byte_count + 6];
                 Request::WriteMultipleCoils(
@@ -112,16 +158,25 @@ impl<'a> TryFrom<&'a [u8]> for Request<'a> {
             }
             FunctionCode::WriteMultipleRegisters => {
                 if 6 > buf.len() {
-                    return Err(Error::IncompleteBuffer);
+                    return Err(Error::IncompleteBuffer {
+                        current_size: buf.len(),
+                        min_needed_size: 6,
+                    });
                 }
                 let address = u16::from_be_bytes(buf[1..3].try_into().unwrap());
                 let quantity = u16::from_be_bytes(buf[3..5].try_into().unwrap());
                 if quantity == 0 || quantity > 0x7b {
-                    return Err(Error::ExceptionCode(ExceptionCode::IllegalDataValue));
+                    return Err(Error::ModbusExceptionError(
+                        fn_code,
+                        ExceptionError::IllegalDataValue,
+                    ));
                 }
                 let byte_count = buf[5] as usize;
                 if byte_count + 6 > buf.len() {
-                    return Err(Error::IncompleteBuffer);
+                    return Err(Error::IncompleteBuffer {
+                        current_size: buf.len(),
+                        min_needed_size: byte_count + 6,
+                    });
                 }
                 let data = &buf[6..byte_count + 6];
                 Request::WriteMultipleRegisters(
@@ -134,7 +189,10 @@ impl<'a> TryFrom<&'a [u8]> for Request<'a> {
             }
             FunctionCode::MaskWriteRegister => {
                 if 7 > buf.len() {
-                    return Err(Error::IncompleteBuffer);
+                    return Err(Error::IncompleteBuffer {
+                        current_size: buf.len(),
+                        min_needed_size: 7,
+                    });
                 }
                 let reference_address = u16::from_be_bytes(buf[1..3].try_into().unwrap());
                 let and_mask = u16::from_be_bytes(buf[3..5].try_into().unwrap());
@@ -143,21 +201,33 @@ impl<'a> TryFrom<&'a [u8]> for Request<'a> {
             }
             FunctionCode::ReadWriteMultipleRegisters => {
                 if 10 > buf.len() {
-                    return Err(Error::IncompleteBuffer);
+                    return Err(Error::IncompleteBuffer {
+                        current_size: buf.len(),
+                        min_needed_size: 10,
+                    });
                 }
                 let read_address = u16::from_be_bytes(buf[1..3].try_into().unwrap());
                 let read_quantity = u16::from_be_bytes(buf[3..5].try_into().unwrap());
                 if read_quantity == 0 || read_quantity > 0x7d {
-                    return Err(Error::ExceptionCode(ExceptionCode::IllegalDataValue));
+                    return Err(Error::ModbusExceptionError(
+                        fn_code,
+                        ExceptionError::IllegalDataValue,
+                    ));
                 }
                 let write_address = u16::from_be_bytes(buf[5..7].try_into().unwrap());
                 let write_quantity = u16::from_be_bytes(buf[7..9].try_into().unwrap());
                 if write_quantity == 0 || write_quantity > 0x7d {
-                    return Err(Error::ExceptionCode(ExceptionCode::IllegalDataValue));
+                    return Err(Error::ModbusExceptionError(
+                        fn_code,
+                        ExceptionError::IllegalDataValue,
+                    ));
                 }
                 let write_byte_count = buf[9] as usize;
                 if write_byte_count + 10 > buf.len() {
-                    return Err(Error::IncompleteBuffer);
+                    return Err(Error::IncompleteBuffer {
+                        current_size: buf.len(),
+                        min_needed_size: write_byte_count + 10,
+                    });
                 }
                 let data = &buf[10..write_byte_count + 10];
                 Request::ReadWriteMultipleRegisters(
@@ -258,7 +328,11 @@ impl<'a> Request<'a> {
 
 #[cfg(test)]
 mod test {
-    use crate::{exception_code::ExceptionCode, pdu::DataCoils};
+    use crate::{
+        error::ExceptionError,
+        exception_code::ExceptionCode,
+        pdu::{function_code::FunctionCode, DataCoils},
+    };
 
     use super::{Error, Request};
 
@@ -267,15 +341,21 @@ mod test {
         let buf: &[u8] = &[];
         assert_eq!(Request::try_from(buf), Err(Error::EmptyBuffer));
 
-        let buf: &[u8] = &[0x80];
+        let buf: &[u8] = &[0x80, 0x01];
         assert_eq!(
             Request::try_from(buf),
-            Err(Error::ExceptionFunctionCode(0x80))
+            Err(Error::ModbusExceptionCode(
+                FunctionCode::ReadCoils,
+                Ok(ExceptionCode::IllegalFunction)
+            ))
         );
-        let buf: &[u8] = &[0x90];
+        let buf: &[u8] = &[0x90, 0x02];
         assert_eq!(
             Request::try_from(buf),
-            Err(Error::ExceptionFunctionCode(0x90))
+            Err(Error::ModbusExceptionCode(
+                FunctionCode::WriteMultipleRegisters,
+                Ok(ExceptionCode::IllegalDataAddress)
+            ))
         );
 
         let buf: &[u8] = &[0x01, 0x00, 0x06, 0x03, 0xe8];
@@ -283,7 +363,10 @@ mod test {
         let buf: &[u8] = &[0x01, 0x00, 0x06, 0x80, 0x00];
         assert_eq!(
             Request::try_from(buf),
-            Err(Error::ExceptionCode(ExceptionCode::IllegalDataValue))
+            Err(Error::ModbusExceptionError(
+                FunctionCode::ReadCoils,
+                ExceptionError::IllegalDataValue,
+            ))
         );
 
         let buf: &[u8] = &[0x0f, 0x00, 0x13, 0x00, 0x0a, 0x02, 0xcd, 0x01];

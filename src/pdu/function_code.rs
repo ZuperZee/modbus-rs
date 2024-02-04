@@ -1,5 +1,3 @@
-use crate::error::Error;
-
 use super::{request::Request as PduRequest, response::Response as PduResponse};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -18,7 +16,7 @@ pub enum FunctionCode {
 }
 
 impl TryFrom<u8> for FunctionCode {
-    type Error = Error;
+    type Error = u8;
 
     fn try_from(code: u8) -> Result<Self, Self::Error> {
         use FunctionCode::*;
@@ -33,7 +31,7 @@ impl TryFrom<u8> for FunctionCode {
             0x10 => Ok(WriteMultipleRegisters),
             0x16 => Ok(MaskWriteRegister),
             0x17 => Ok(ReadWriteMultipleRegisters),
-            0x80.. => Err(Error::ExceptionFunctionCode(code)),
+            0x80.. => Err(code),
             code => Ok(Custom(code)),
         }
     }
@@ -108,17 +106,8 @@ mod test {
             Ok(FunctionCode::WriteSingleCoil)
         );
         assert_eq!(FunctionCode::try_from(0x20), Ok(FunctionCode::Custom(0x20)));
-        assert_eq!(
-            FunctionCode::try_from(0x80),
-            Err(Error::ExceptionFunctionCode(0x80))
-        );
-        assert_eq!(
-            FunctionCode::try_from(0x9a),
-            Err(Error::ExceptionFunctionCode(0x9a))
-        );
-        assert_eq!(
-            FunctionCode::try_from(0xff),
-            Err(Error::ExceptionFunctionCode(0xff))
-        );
+        assert_eq!(FunctionCode::try_from(0x80), Err(0x80));
+        assert_eq!(FunctionCode::try_from(0x9a), Err(0x9a));
+        assert_eq!(FunctionCode::try_from(0xff), Err(0xff));
     }
 }

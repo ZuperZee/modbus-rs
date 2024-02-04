@@ -1,47 +1,82 @@
-use crate::{error::Error, pdu::response::Response as PduResponse};
+use crate::{
+    error::Error,
+    pdu::{exception_response::ExceptionResponse, response::Response as PduResponse},
+};
 
 use super::header::Header;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Response<'a> {
     pub header: Header,
-    pub pdu: PduResponse<'a>,
+    pub pdu: Result<PduResponse<'a>, ExceptionResponse>,
 }
 
 impl<'a> TryFrom<&'a [u8]> for Response<'a> {
     type Error = Error;
 
     fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
-        if value.len() < 7 {
-            return Err(Error::IncompleteBuffer);
+        if value.len() < Header::size() {
+            return Err(Error::IncompleteBuffer {
+                current_size: value.len(),
+                min_needed_size: Header::size(),
+            });
         };
 
-        let (header_buf, pdu_buf) = value.split_at(7);
+        let (header_buf, pdu_buf) = value.split_at(Header::size());
 
         let header = Header::try_from(header_buf)?;
         if header.length as usize > pdu_buf.len() + 1 {
-            return Err(Error::IncompleteBuffer);
+            return Err(Error::IncompleteBuffer {
+                current_size: value.len(),
+                // unit_id is included in the header.length and header.size
+                // so we need to subtract 1
+                min_needed_size: header.length as usize + Header::size() - 1,
+            });
         };
 
-        let pdu = PduResponse::try_from(pdu_buf)?;
+        let pdu = PduResponse::try_from(pdu_buf).map_err(|err| match err {
+            Error::IncompleteBuffer {
+                current_size,
+                min_needed_size,
+            } => Error::IncompleteBuffer {
+                current_size: current_size + Header::size(),
+                min_needed_size: min_needed_size + Header::size(),
+            },
+            err => err,
+        })?;
 
-        Ok(Self { header, pdu })
+        Ok(Self {
+            header,
+            pdu: Ok(pdu),
+        })
     }
 }
 
 impl<'a> Response<'a> {
-    pub fn new(transaction_id: u16, unit_id: u8, pdu_res: PduResponse<'a>) -> Self {
+    pub fn new(
+        transaction_id: u16,
+        unit_id: u8,
+        pdu_res: Result<PduResponse<'a>, ExceptionResponse>,
+    ) -> Self {
+        let pdu_len = match &pdu_res {
+            Ok(pdu) => pdu.pdu_len(),
+            Err(pdu) => pdu.pdu_len(),
+        };
         Self {
-            header: Header::new(transaction_id, (pdu_res.pdu_len() + 1) as u16, unit_id),
+            // length is + 1 because of the unit_id
+            header: Header::new(transaction_id, (pdu_len + 1) as u16, unit_id),
             pdu: pdu_res,
         }
     }
     pub fn pdu_len(&self) -> usize {
-        self.pdu.pdu_len()
+        match &self.pdu {
+            Ok(pdu) => pdu.pdu_len(),
+            Err(pdu) => pdu.pdu_len(),
+        }
     }
 
     pub fn adu_len(&self) -> usize {
-        self.pdu_len() + self.header.size()
+        self.pdu_len() + Header::size()
     }
 
     pub fn encode(&self, buf: &mut [u8]) -> Result<usize, Error> {
@@ -49,10 +84,13 @@ impl<'a> Response<'a> {
             return Err(Error::InvalidBufferSize);
         }
 
-        let (header_buf, pdu_buf) = buf.split_at_mut(self.header.size());
+        let (header_buf, pdu_buf) = buf.split_at_mut(Header::size());
 
         let header_size = self.header.encode(header_buf)?;
-        let pdu_size = self.pdu.encode(pdu_buf)?;
+        let pdu_size = match &self.pdu {
+            Ok(pdu) => pdu.encode(pdu_buf)?,
+            Err(pdu) => pdu.encode(pdu_buf)?,
+        };
 
         Ok(header_size + pdu_size)
     }
@@ -76,10 +114,10 @@ mod test {
                     length: 13,
                     unit_id: 1,
                 },
-                pdu: PduResponse::ReadInputRegisters(DataWords {
+                pdu: Ok(PduResponse::ReadInputRegisters(DataWords {
                     data: &[0, 1, 0, 2, 0, 3, 0, 4, 0, 5],
                     quantity: 5
-                })
+                }))
             })
         );
     }
@@ -93,10 +131,10 @@ mod test {
                 length: 13,
                 unit_id: 1,
             },
-            pdu: PduResponse::ReadInputRegisters(DataWords {
+            pdu: Ok(PduResponse::ReadInputRegisters(DataWords {
                 data: &[0, 1, 0, 2, 0, 3, 0, 4, 0, 5],
                 quantity: 5,
-            }),
+            })),
         };
         let buf = &mut [0_u8; 19];
         let adu_len = res.encode(buf);
