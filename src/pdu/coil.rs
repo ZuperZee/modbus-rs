@@ -37,7 +37,7 @@ impl<'a, 'b> DataCoils<'a> {
     pub fn copy_coils_to(&self, coils: &'b mut [bool]) -> &'b [bool] {
         for (i, coil) in coils.iter_mut().enumerate().take(self.quantity) {
             let byte = self.data[i / 8];
-            let bit_pos = 7 - (i % 8);
+            let bit_pos = i % 8;
             *coil = (byte & (1 << (bit_pos))) != 0;
         }
 
@@ -54,7 +54,7 @@ impl From<DataCoils<'_>> for Vec<bool> {
     fn from(data_coils: DataCoils) -> Self {
         Vec::from_iter((0..data_coils.quantity).map(|i| {
             let byte = data_coils.data[i / 8];
-            let bit_pos = 7 - (i % 8);
+            let bit_pos = i % 8;
             (byte & (1 << (bit_pos))) != 0
         }))
     }
@@ -66,18 +66,18 @@ pub mod test {
 
     #[test]
     fn data_coils_from_coils() {
-        let mut buf = [0_u8; 20];
+        let mut buf = [0_u8; 0x13];
         let coils = &[
-            true, true, true, true, true, true, true, true, true, false, false, true, false, false,
-            false, false, false, false, false, false, false, false, true,
+            true, false, true, true, false, false, true, true, true, true, false, true, false,
+            true, true, false, true, false, true
         ];
         let data_coils = DataCoils::from_coils(coils, &mut buf);
 
         assert_eq!(
             data_coils,
             DataCoils {
-                data: &[255, 9, 64],
-                quantity: 23
+                data: &[0xCD, 0x6B, 0x05],
+                quantity: 0x13
             }
         );
 
@@ -96,10 +96,10 @@ pub mod test {
 
     #[test]
     fn coils_from_data_coils() {
-        let mut coils_buf = [false; 20];
+        let mut coils_buf = [false; 0x13];
         let data_coils = DataCoils {
-            data: &[255, 9, 64],
-            quantity: 18,
+            data: &[0xCD, 0x6B, 0x05],
+            quantity: 0x13,
         };
 
         let coils = data_coils.copy_coils_to(&mut coils_buf);
@@ -107,17 +107,28 @@ pub mod test {
         assert_eq!(
             coils,
             &[
-                true, true, true, true, true, true, true, true, false, false, false, false, true,
-                false, false, true, false, true,
+                true, false, true, true, false, false, true, true, true, true, false, true, false,
+                true, true, false, true, false, true
             ]
         );
         assert_eq!(
             coils_buf,
             [
-                true, true, true, true, true, true, true, true, false, false, false, false, true,
-                false, false, true, false, true, false, false,
+                true, false, true, true, false, false, true, true, true, true, false, true, false,
+                true, true, false, true, false, true
             ]
         );
+
+        let mut coils_buf = [false; 0x8];
+        let data_coils = DataCoils {
+            data: &[0xfe],
+            quantity: 0x8,
+        };
+
+        let coils = data_coils.copy_coils_to(&mut coils_buf);
+
+        assert_eq!(coils, &[false, true, true, true, true, true, true, true]);
+        assert_eq!(coils_buf, [false, true, true, true, true, true, true, true]);
     }
 
     #[cfg(feature = "alloc")]
@@ -128,7 +139,7 @@ pub mod test {
     #[test]
     fn vec_coils_from_data_coils() {
         let data_coils = DataCoils {
-            data: &[255, 9, 64],
+            data: &[255, 9, 2],
             quantity: 18,
         };
 
@@ -137,8 +148,8 @@ pub mod test {
         assert_eq!(
             coils,
             &[
-                true, true, true, true, true, true, true, true, false, false, false, false, true,
-                false, false, true, false, true,
+                true, true, true, true, true, true, true, true, true, false, false, true, false,
+                false, false, false, false, true,
             ]
         );
     }
