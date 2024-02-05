@@ -341,7 +341,7 @@ mod test {
         let buf: &[u8] = &[];
         assert_eq!(Request::try_from(buf), Err(Error::EmptyBuffer));
 
-        let buf: &[u8] = &[0x80, 0x01];
+        let buf: &[u8] = &[0x81, 0x01];
         assert_eq!(
             Request::try_from(buf),
             Err(Error::ModbusExceptionCode(
