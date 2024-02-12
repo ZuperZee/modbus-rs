@@ -64,7 +64,7 @@ fn handle_connection(mut stream: TcpStream) {
         let header = Header::try_from(req_header_buf).unwrap();
         if header.unit_id == 111 {
             // Disallow unit_id 111. Hopefully no one got screwed by disallowing 111 xD
-            // Can be changed to only allow unit_id 1 or something (req.header.unit_id != 1).
+            // Can be changed to only allow unit_id 1 or something (header.unit_id != 1).
             // This is more for showing where to put the check.
             return;
         }
