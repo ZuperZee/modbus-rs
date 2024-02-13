@@ -1,4 +1,4 @@
-use crate::{error::Error, pdu::request::Request as PduRequest};
+use crate::{error::EncodeError, pdu::request::Request as PduRequest};
 
 use super::header::Header;
 
@@ -24,9 +24,9 @@ impl<'a> Request<'a> {
         self.pdu_len() + Header::size()
     }
 
-    pub fn encode(&self, buf: &mut [u8]) -> Result<usize, Error> {
+    pub fn encode(&self, buf: &mut [u8]) -> Result<usize, EncodeError> {
         if self.adu_len() > buf.len() {
-            return Err(Error::InvalidBufferSize);
+            return Err(EncodeError::InvalidBufferSize);
         }
 
         let (header_buf, pdu_buf) = buf.split_at_mut(Header::size());

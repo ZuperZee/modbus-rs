@@ -6,7 +6,7 @@ use std::{
 
 use modbus::{
     adu::tcp::{request::Request as AduRequest, response::Response as AduResponse},
-    error::Error,
+    error::DecodeError,
     pdu::request::Request as PduRequest,
 };
 
@@ -48,29 +48,25 @@ fn main() {
                 break;
             }
             Err(err) => match err {
-                Error::EmptyBuffer => {
+                DecodeError::EmptyBuffer => {
                     println!("Empty buffer");
                     continue;
                 }
-                Error::IncompleteBuffer {
+                DecodeError::IncompleteBuffer {
                     current_size,
                     min_needed_size,
                 } => {
                     println!("Incomplete buffer: {}/{}", current_size, min_needed_size);
                     continue;
                 }
-                Error::InvalidBufferSize => {
-                    println!("Invalid buffer size");
-                    break;
-                }
-                Error::ModbusExceptionError(fn_code, exception_error) => {
+                DecodeError::ModbusExceptionError(fn_code, exception_error) => {
                     println!(
                         "Modbus exception error: {:?} {:?}",
                         fn_code, exception_error
                     );
                     break;
                 }
-                Error::ModbusExceptionCode(fn_code, exception_code) => {
+                DecodeError::ModbusExceptionCode(fn_code, exception_code) => {
                     println!("Modbus exception code: {:?} {:?}", fn_code, exception_code);
                     break;
                 }

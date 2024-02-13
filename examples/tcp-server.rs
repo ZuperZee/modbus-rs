@@ -6,7 +6,7 @@ use std::{
 
 use modbus::{
     adu::tcp::{header::Header, request::Request as AduRequest, response::Response as AduResponse},
-    error::Error,
+    error::DecodeError,
     exception_code::ExceptionCode,
     pdu::{
         exception_response::ExceptionResponse as PduExceptionResponse, function_code::FunctionCode,
@@ -79,29 +79,25 @@ fn handle_connection(mut stream: TcpStream) {
         let pdu_req = match PduRequest::try_from(req_pdu_buf) {
             Ok(req) => req,
             Err(err) => match err {
-                Error::EmptyBuffer => {
+                DecodeError::EmptyBuffer => {
                     println!("Empty buffer");
                     continue;
                 }
-                Error::IncompleteBuffer {
+                DecodeError::IncompleteBuffer {
                     current_size,
                     min_needed_size,
                 } => {
                     println!("Incomplete buffer: {}/{}", current_size, min_needed_size);
                     continue;
                 }
-                Error::InvalidBufferSize => {
-                    println!("Invalid buffer size");
-                    break;
-                }
-                Error::ModbusExceptionError(fn_code, exception_error) => {
+                DecodeError::ModbusExceptionError(fn_code, exception_error) => {
                     println!(
                         "Modbus exception error: {:?} {:?}",
                         fn_code, exception_error
                     );
                     break;
                 }
-                Error::ModbusExceptionCode(fn_code, exception_code) => {
+                DecodeError::ModbusExceptionCode(fn_code, exception_code) => {
                     println!("Modbus exception code: {:?} {:?}", fn_code, exception_code);
                     break;
                 }

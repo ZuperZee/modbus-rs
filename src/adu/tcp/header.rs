@@ -1,4 +1,4 @@
-use crate::error::Error;
+use crate::error::{DecodeError, EncodeError};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Header {
@@ -9,11 +9,11 @@ pub struct Header {
 }
 
 impl<'a> TryFrom<&'a [u8]> for Header {
-    type Error = Error;
+    type Error = DecodeError;
 
     fn try_from(buf: &'a [u8]) -> Result<Self, Self::Error> {
         if buf.len() < Header::size() {
-            return Err(Error::IncompleteBuffer {
+            return Err(DecodeError::IncompleteBuffer {
                 current_size: buf.len(),
                 min_needed_size: Header::size(),
             });
@@ -46,9 +46,9 @@ impl Header {
         7
     }
 
-    pub fn encode(&self, buf: &mut [u8]) -> Result<usize, Error> {
+    pub fn encode(&self, buf: &mut [u8]) -> Result<usize, EncodeError> {
         if Self::size() > buf.len() {
-            return Err(Error::InvalidBufferSize);
+            return Err(EncodeError::InvalidBufferSize);
         }
 
         buf[0..2].copy_from_slice(&self.transaction_id.to_be_bytes());

@@ -1,4 +1,4 @@
-use crate::{error::Error, exception_code::ExceptionCode};
+use crate::{error::EncodeError, exception_code::ExceptionCode};
 
 use super::function_code::FunctionCode;
 
@@ -13,9 +13,9 @@ impl ExceptionResponse {
         2
     }
 
-    pub fn encode(&self, buf: &mut [u8]) -> Result<usize, Error> {
+    pub fn encode(&self, buf: &mut [u8]) -> Result<usize, EncodeError> {
         if self.pdu_len() > buf.len() {
-            return Err(Error::InvalidBufferSize);
+            return Err(EncodeError::InvalidBufferSize);
         }
         buf[0] = u8::from(self.function_code) | 0x80;
         buf[1] = self.exception_code as u8;

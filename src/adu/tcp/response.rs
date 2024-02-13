@@ -1,5 +1,5 @@
 use crate::{
-    error::Error,
+    error::{DecodeError, EncodeError},
     pdu::{exception_response::ExceptionResponse, response::Response as PduResponse},
 };
 
@@ -12,11 +12,11 @@ pub struct Response<'a> {
 }
 
 impl<'a> TryFrom<&'a [u8]> for Response<'a> {
-    type Error = Error;
+    type Error = DecodeError;
 
     fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
         if value.len() < Header::size() {
-            return Err(Error::IncompleteBuffer {
+            return Err(DecodeError::IncompleteBuffer {
                 current_size: value.len(),
                 min_needed_size: Header::size(),
             });
@@ -26,7 +26,7 @@ impl<'a> TryFrom<&'a [u8]> for Response<'a> {
 
         let header = Header::try_from(header_buf)?;
         if header.length as usize > pdu_buf.len() + 1 {
-            return Err(Error::IncompleteBuffer {
+            return Err(DecodeError::IncompleteBuffer {
                 current_size: value.len(),
                 // unit_id is included in the header.length and header.size
                 // so we need to subtract 1
@@ -35,10 +35,10 @@ impl<'a> TryFrom<&'a [u8]> for Response<'a> {
         };
 
         let pdu = PduResponse::try_from(pdu_buf).map_err(|err| match err {
-            Error::IncompleteBuffer {
+            DecodeError::IncompleteBuffer {
                 current_size,
                 min_needed_size,
-            } => Error::IncompleteBuffer {
+            } => DecodeError::IncompleteBuffer {
                 current_size: current_size + Header::size(),
                 min_needed_size: min_needed_size + Header::size(),
             },
@@ -79,9 +79,9 @@ impl<'a> Response<'a> {
         self.pdu_len() + Header::size()
     }
 
-    pub fn encode(&self, buf: &mut [u8]) -> Result<usize, Error> {
+    pub fn encode(&self, buf: &mut [u8]) -> Result<usize, EncodeError> {
         if self.adu_len() > buf.len() {
-            return Err(Error::InvalidBufferSize);
+            return Err(EncodeError::InvalidBufferSize);
         }
 
         let (header_buf, pdu_buf) = buf.split_at_mut(Header::size());

@@ -1,5 +1,5 @@
 use crate::{
-    error::{Error, ExceptionError},
+    error::{DecodeError, EncodeError, ExceptionError},
     exception_code::ExceptionCode,
 };
 
@@ -23,21 +23,21 @@ pub enum Response<'a> {
 }
 
 impl<'a> TryFrom<&'a [u8]> for Response<'a> {
-    type Error = Error;
+    type Error = DecodeError;
 
     fn try_from(buf: &'a [u8]) -> Result<Self, Self::Error> {
         if buf.is_empty() {
-            return Err(Error::EmptyBuffer);
+            return Err(DecodeError::EmptyBuffer);
         }
 
         let fn_code: FunctionCode = buf[0].try_into().map_err(|c| {
             if buf.len() > 1 {
-                Error::ModbusExceptionCode(
+                DecodeError::ModbusExceptionCode(
                     FunctionCode::try_from(c & 0x7f).unwrap(),
                     ExceptionCode::try_from(buf[1]),
                 )
             } else {
-                Error::IncompleteBuffer {
+                DecodeError::IncompleteBuffer {
                     current_size: 1,
                     min_needed_size: 2,
                 }
@@ -47,13 +47,13 @@ impl<'a> TryFrom<&'a [u8]> for Response<'a> {
         let response = match fn_code {
             FunctionCode::ReadCoils | FunctionCode::ReadDiscreteInput => {
                 let Some(byte_count) = buf.get(1).map(|&v| v as usize) else {
-                    return Err(Error::IncompleteBuffer {
+                    return Err(DecodeError::IncompleteBuffer {
                         current_size: 1,
                         min_needed_size: 2,
                     });
                 };
                 if byte_count + 2 > buf.len() {
-                    return Err(Error::IncompleteBuffer {
+                    return Err(DecodeError::IncompleteBuffer {
                         current_size: buf.len(),
                         min_needed_size: byte_count + 2,
                     });
@@ -72,13 +72,13 @@ impl<'a> TryFrom<&'a [u8]> for Response<'a> {
             | FunctionCode::ReadInputRegisters
             | FunctionCode::ReadWriteMultipleRegisters => {
                 let Some(byte_count) = buf.get(1).map(|&v| v as usize) else {
-                    return Err(Error::IncompleteBuffer {
+                    return Err(DecodeError::IncompleteBuffer {
                         current_size: 1,
                         min_needed_size: 2,
                     });
                 };
                 if byte_count + 2 > buf.len() {
-                    return Err(Error::IncompleteBuffer {
+                    return Err(DecodeError::IncompleteBuffer {
                         current_size: buf.len(),
                         min_needed_size: byte_count + 2,
                     });
@@ -103,7 +103,7 @@ impl<'a> TryFrom<&'a [u8]> for Response<'a> {
             | FunctionCode::WriteMultipleCoils
             | FunctionCode::WriteMultipleRegisters => {
                 if 5 > buf.len() {
-                    return Err(Error::IncompleteBuffer {
+                    return Err(DecodeError::IncompleteBuffer {
                         current_size: buf.len(),
                         min_needed_size: 5,
                     });
@@ -117,7 +117,7 @@ impl<'a> TryFrom<&'a [u8]> for Response<'a> {
                             0x0000 => false,
                             0xff00 => true,
                             _ => {
-                                return Err(Error::ModbusExceptionError(
+                                return Err(DecodeError::ModbusExceptionError(
                                     fn_code,
                                     ExceptionError::IllegalDataValue,
                                 ))
@@ -132,7 +132,7 @@ impl<'a> TryFrom<&'a [u8]> for Response<'a> {
                         if data >= 0x0001 || data <= 0x07b0 {
                             Response::WriteMultipleCoils(address, data)
                         } else {
-                            return Err(Error::ModbusExceptionError(
+                            return Err(DecodeError::ModbusExceptionError(
                                 fn_code,
                                 ExceptionError::IllegalDataValue,
                             ));
@@ -142,7 +142,7 @@ impl<'a> TryFrom<&'a [u8]> for Response<'a> {
                         if data >= 0x0001 || data <= 0x007b {
                             Response::WriteMultipleRegisters(address, data)
                         } else {
-                            return Err(Error::ModbusExceptionError(
+                            return Err(DecodeError::ModbusExceptionError(
                                 fn_code,
                                 ExceptionError::IllegalDataValue,
                             ));
@@ -153,7 +153,7 @@ impl<'a> TryFrom<&'a [u8]> for Response<'a> {
             }
             FunctionCode::MaskWriteRegister => {
                 if 7 > buf.len() {
-                    return Err(Error::IncompleteBuffer {
+                    return Err(DecodeError::IncompleteBuffer {
                         current_size: buf.len(),
                         min_needed_size: 7,
                     });
@@ -186,9 +186,9 @@ impl<'a> Response<'a> {
         }
     }
 
-    pub fn encode(&self, buf: &mut [u8]) -> Result<usize, Error> {
+    pub fn encode(&self, buf: &mut [u8]) -> Result<usize, EncodeError> {
         if self.pdu_len() > buf.len() {
-            return Err(Error::InvalidBufferSize);
+            return Err(EncodeError::InvalidBufferSize);
         }
 
         buf[0] = FunctionCode::from(self).into();
@@ -235,17 +235,17 @@ mod test {
         pdu::{function_code::FunctionCode, DataWords},
     };
 
-    use super::{DataCoils, Error, Response};
+    use super::{DataCoils, DecodeError, Response};
 
     #[test]
     fn response_from_buffer() {
         let buf: &[u8] = &[];
-        assert_eq!(Response::try_from(buf), Err(Error::EmptyBuffer));
+        assert_eq!(Response::try_from(buf), Err(DecodeError::EmptyBuffer));
 
         let buf: &[u8] = &[0x81, 0x01];
         assert_eq!(
             Response::try_from(buf),
-            Err(Error::ModbusExceptionCode(
+            Err(DecodeError::ModbusExceptionCode(
                 FunctionCode::ReadCoils,
                 Ok(ExceptionCode::IllegalFunction)
             ))
@@ -253,7 +253,7 @@ mod test {
         let buf: &[u8] = &[0x90, 0x02];
         assert_eq!(
             Response::try_from(buf),
-            Err(Error::ModbusExceptionCode(
+            Err(DecodeError::ModbusExceptionCode(
                 FunctionCode::WriteMultipleRegisters,
                 Ok(ExceptionCode::IllegalDataAddress)
             ))
@@ -298,7 +298,7 @@ mod test {
         let buf: &[u8] = &[0x01, 0x02, 0xff];
         assert_eq!(
             Response::try_from(buf),
-            Err(Error::IncompleteBuffer {
+            Err(DecodeError::IncompleteBuffer {
                 current_size: 3,
                 min_needed_size: 4,
             })
@@ -306,7 +306,7 @@ mod test {
         let buf: &[u8] = &[0x01];
         assert_eq!(
             Response::try_from(buf),
-            Err(Error::IncompleteBuffer {
+            Err(DecodeError::IncompleteBuffer {
                 current_size: 1,
                 min_needed_size: 2,
             })
@@ -314,7 +314,7 @@ mod test {
         let buf: &[u8] = &[0x02];
         assert_eq!(
             Response::try_from(buf),
-            Err(Error::IncompleteBuffer {
+            Err(DecodeError::IncompleteBuffer {
                 current_size: 1,
                 min_needed_size: 2,
             })
@@ -322,7 +322,7 @@ mod test {
         let buf: &[u8] = &[0x03];
         assert_eq!(
             Response::try_from(buf),
-            Err(Error::IncompleteBuffer {
+            Err(DecodeError::IncompleteBuffer {
                 current_size: 1,
                 min_needed_size: 2,
             })
@@ -330,7 +330,7 @@ mod test {
         let buf: &[u8] = &[0x04];
         assert_eq!(
             Response::try_from(buf),
-            Err(Error::IncompleteBuffer {
+            Err(DecodeError::IncompleteBuffer {
                 current_size: 1,
                 min_needed_size: 2,
             })
@@ -338,7 +338,7 @@ mod test {
         let buf: &[u8] = &[0x04, 0x04, 0x00, 0x11, 0x00];
         assert_eq!(
             Response::try_from(buf),
-            Err(Error::IncompleteBuffer {
+            Err(DecodeError::IncompleteBuffer {
                 current_size: 5,
                 min_needed_size: 6,
             })
@@ -346,7 +346,7 @@ mod test {
         let buf: &[u8] = &[0x04, 0x04, 0x00, 0x11];
         assert_eq!(
             Response::try_from(buf),
-            Err(Error::IncompleteBuffer {
+            Err(DecodeError::IncompleteBuffer {
                 current_size: 4,
                 min_needed_size: 6,
             })
