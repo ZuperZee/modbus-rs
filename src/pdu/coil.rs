@@ -69,7 +69,7 @@ pub mod test {
         let mut buf = [0_u8; 0x13];
         let coils = &[
             true, false, true, true, false, false, true, true, true, true, false, true, false,
-            true, true, false, true, false, true
+            true, true, false, true, false, true,
         ];
         let data_coils = DataCoils::from_coils(coils, &mut buf);
 
