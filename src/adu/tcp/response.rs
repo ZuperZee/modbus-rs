@@ -11,47 +11,6 @@ pub struct Response<'a> {
     pub pdu: Result<PduResponse<'a>, ExceptionResponse>,
 }
 
-impl<'a> TryFrom<&'a [u8]> for Response<'a> {
-    type Error = DecodeError;
-
-    fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
-        if value.len() < Header::size() {
-            return Err(DecodeError::IncompleteBuffer {
-                current_size: value.len(),
-                min_needed_size: Header::size(),
-            });
-        };
-
-        let (header_buf, pdu_buf) = value.split_at(Header::size());
-
-        let header = Header::try_from(header_buf)?;
-        if header.length as usize > pdu_buf.len() + 1 {
-            return Err(DecodeError::IncompleteBuffer {
-                current_size: value.len(),
-                // unit_id is included in the header.length and header.size
-                // so we need to subtract 1
-                min_needed_size: header.length as usize + Header::size() - 1,
-            });
-        };
-
-        let pdu = PduResponse::try_from(pdu_buf).map_err(|err| match err {
-            DecodeError::IncompleteBuffer {
-                current_size,
-                min_needed_size,
-            } => DecodeError::IncompleteBuffer {
-                current_size: current_size + Header::size(),
-                min_needed_size: min_needed_size + Header::size(),
-            },
-            err => err,
-        })?;
-
-        Ok(Self {
-            header,
-            pdu: Ok(pdu),
-        })
-    }
-}
-
 impl<'a> Response<'a> {
     pub fn new(
         transaction_id: u16,
@@ -93,6 +52,51 @@ impl<'a> Response<'a> {
         };
 
         Ok(header_size + pdu_size)
+    }
+
+    pub fn decode(buf: &'a [u8]) -> Result<Self, DecodeError> {
+        if buf.len() < Header::size() {
+            return Err(DecodeError::IncompleteBuffer {
+                current_size: buf.len(),
+                min_needed_size: Header::size(),
+            });
+        };
+
+        let (header_buf, pdu_buf) = buf.split_at(Header::size());
+
+        let header = Header::try_from(header_buf)?;
+        if header.length as usize > pdu_buf.len() + 1 {
+            return Err(DecodeError::IncompleteBuffer {
+                current_size: buf.len(),
+                // unit_id is included in the header.length and header.size
+                // so we need to subtract 1
+                min_needed_size: header.length as usize + Header::size() - 1,
+            });
+        };
+
+        let pdu = PduResponse::try_from(pdu_buf).map_err(|err| match err {
+            DecodeError::IncompleteBuffer {
+                current_size,
+                min_needed_size,
+            } => DecodeError::IncompleteBuffer {
+                current_size: current_size + Header::size(),
+                min_needed_size: min_needed_size + Header::size(),
+            },
+            err => err,
+        })?;
+
+        Ok(Self {
+            header,
+            pdu: Ok(pdu),
+        })
+    }
+}
+
+impl<'a> TryFrom<&'a [u8]> for Response<'a> {
+    type Error = DecodeError;
+
+    fn try_from(buf: &'a [u8]) -> Result<Self, Self::Error> {
+        Self::decode(buf)
     }
 }
 

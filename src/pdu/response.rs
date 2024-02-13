@@ -22,10 +22,64 @@ pub enum Response<'a> {
     Custom(FunctionCode, &'a [u8]),
 }
 
-impl<'a> TryFrom<&'a [u8]> for Response<'a> {
-    type Error = DecodeError;
+impl<'a> Response<'a> {
+    pub fn pdu_len(&self) -> usize {
+        match &self {
+            Response::ReadCoils(coils) | Response::ReadDiscreteInput(coils) => 2 + coils.data.len(),
+            Response::ReadHoldingRegisters(words)
+            | Response::ReadInputRegisters(words)
+            | Response::ReadWriteMultipleRegisters(words) => 2 + words.data.len(),
+            Response::WriteSingleCoil(_, _)
+            | Response::WriteSingleRegister(_, _)
+            | Response::WriteMultipleCoils(_, _)
+            | Response::WriteMultipleRegisters(_, _) => 5,
+            Response::MaskWriteRegister(_, _, _) => 7,
+            Response::Custom(_, d) => 1 + d.len(),
+        }
+    }
 
-    fn try_from(buf: &'a [u8]) -> Result<Self, Self::Error> {
+    pub fn encode(&self, buf: &mut [u8]) -> Result<usize, EncodeError> {
+        if self.pdu_len() > buf.len() {
+            return Err(EncodeError::InvalidBufferSize);
+        }
+
+        buf[0] = FunctionCode::from(self).into();
+
+        match &self {
+            Response::ReadCoils(coils) | Response::ReadDiscreteInput(coils) => {
+                buf[1] = coils.data.len() as u8;
+                buf[2..2 + coils.data.len()].copy_from_slice(coils.data);
+            }
+            Response::ReadHoldingRegisters(words)
+            | Response::ReadInputRegisters(words)
+            | Response::ReadWriteMultipleRegisters(words) => {
+                buf[1] = words.data.len() as u8;
+                buf[2..2 + words.data.len()].copy_from_slice(words.data);
+            }
+            Response::WriteSingleCoil(address, coil) => {
+                buf[1..3].copy_from_slice(&address.to_be_bytes());
+                let data = coil_to_u16_coil(*coil);
+                buf[3..5].copy_from_slice(&data.to_be_bytes());
+            }
+            Response::WriteSingleRegister(address, data)
+            | Response::WriteMultipleCoils(address, data)
+            | Response::WriteMultipleRegisters(address, data) => {
+                buf[1..3].copy_from_slice(&address.to_be_bytes());
+                buf[3..5].copy_from_slice(&data.to_be_bytes());
+            }
+            Response::MaskWriteRegister(address, and_mask, or_mask) => {
+                buf[1..3].copy_from_slice(&address.to_be_bytes());
+                buf[3..5].copy_from_slice(&and_mask.to_be_bytes());
+                buf[5..7].copy_from_slice(&or_mask.to_be_bytes());
+            }
+            Response::Custom(_, data) => {
+                buf[1..1 + data.len()].copy_from_slice(data);
+            }
+        };
+        Ok(self.pdu_len())
+    }
+
+    pub fn decode(buf: &'a [u8]) -> Result<Self, DecodeError> {
         if buf.is_empty() {
             return Err(DecodeError::EmptyBuffer);
         }
@@ -170,61 +224,11 @@ impl<'a> TryFrom<&'a [u8]> for Response<'a> {
     }
 }
 
-impl<'a> Response<'a> {
-    pub fn pdu_len(&self) -> usize {
-        match &self {
-            Response::ReadCoils(coils) | Response::ReadDiscreteInput(coils) => 2 + coils.data.len(),
-            Response::ReadHoldingRegisters(words)
-            | Response::ReadInputRegisters(words)
-            | Response::ReadWriteMultipleRegisters(words) => 2 + words.data.len(),
-            Response::WriteSingleCoil(_, _)
-            | Response::WriteSingleRegister(_, _)
-            | Response::WriteMultipleCoils(_, _)
-            | Response::WriteMultipleRegisters(_, _) => 5,
-            Response::MaskWriteRegister(_, _, _) => 7,
-            Response::Custom(_, d) => 1 + d.len(),
-        }
-    }
+impl<'a> TryFrom<&'a [u8]> for Response<'a> {
+    type Error = DecodeError;
 
-    pub fn encode(&self, buf: &mut [u8]) -> Result<usize, EncodeError> {
-        if self.pdu_len() > buf.len() {
-            return Err(EncodeError::InvalidBufferSize);
-        }
-
-        buf[0] = FunctionCode::from(self).into();
-
-        match &self {
-            Response::ReadCoils(coils) | Response::ReadDiscreteInput(coils) => {
-                buf[1] = coils.data.len() as u8;
-                buf[2..2 + coils.data.len()].copy_from_slice(coils.data);
-            }
-            Response::ReadHoldingRegisters(words)
-            | Response::ReadInputRegisters(words)
-            | Response::ReadWriteMultipleRegisters(words) => {
-                buf[1] = words.data.len() as u8;
-                buf[2..2 + words.data.len()].copy_from_slice(words.data);
-            }
-            Response::WriteSingleCoil(address, coil) => {
-                buf[1..3].copy_from_slice(&address.to_be_bytes());
-                let data = coil_to_u16_coil(*coil);
-                buf[3..5].copy_from_slice(&data.to_be_bytes());
-            }
-            Response::WriteSingleRegister(address, data)
-            | Response::WriteMultipleCoils(address, data)
-            | Response::WriteMultipleRegisters(address, data) => {
-                buf[1..3].copy_from_slice(&address.to_be_bytes());
-                buf[3..5].copy_from_slice(&data.to_be_bytes());
-            }
-            Response::MaskWriteRegister(address, and_mask, or_mask) => {
-                buf[1..3].copy_from_slice(&address.to_be_bytes());
-                buf[3..5].copy_from_slice(&and_mask.to_be_bytes());
-                buf[5..7].copy_from_slice(&or_mask.to_be_bytes());
-            }
-            Response::Custom(_, data) => {
-                buf[1..1 + data.len()].copy_from_slice(data);
-            }
-        };
-        Ok(self.pdu_len())
+    fn try_from(buf: &'a [u8]) -> Result<Self, Self::Error> {
+        Self::decode(buf)
     }
 }
 

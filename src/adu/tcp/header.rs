@@ -8,14 +8,38 @@ pub struct Header {
     pub unit_id: u8,
 }
 
-impl<'a> TryFrom<&'a [u8]> for Header {
-    type Error = DecodeError;
+impl Header {
+    pub fn new(transaction_id: u16, length: u16, unit_id: u8) -> Self {
+        Self {
+            transaction_id,
+            protocol_id: 0,
+            length,
+            unit_id,
+        }
+    }
 
-    fn try_from(buf: &'a [u8]) -> Result<Self, Self::Error> {
-        if buf.len() < Header::size() {
+    pub const fn size() -> usize {
+        7
+    }
+
+    pub fn encode(&self, buf: &mut [u8]) -> Result<usize, EncodeError> {
+        if Self::size() > buf.len() {
+            return Err(EncodeError::InvalidBufferSize);
+        }
+
+        buf[0..2].copy_from_slice(&self.transaction_id.to_be_bytes());
+        buf[2..4].copy_from_slice(&self.protocol_id.to_be_bytes());
+        buf[4..6].copy_from_slice(&self.length.to_be_bytes());
+        buf[6] = self.unit_id;
+
+        Ok(Self::size())
+    }
+
+    pub fn decode(buf: &[u8]) -> Result<Self, DecodeError> {
+        if buf.len() < Self::size() {
             return Err(DecodeError::IncompleteBuffer {
                 current_size: buf.len(),
-                min_needed_size: Header::size(),
+                min_needed_size: Self::size(),
             });
         };
 
@@ -33,29 +57,10 @@ impl<'a> TryFrom<&'a [u8]> for Header {
     }
 }
 
-impl Header {
-    pub fn new(transaction_id: u16, length: u16, unit_id: u8) -> Self {
-        Self {
-            transaction_id,
-            protocol_id: 0,
-            length,
-            unit_id,
-        }
-    }
-    pub const fn size() -> usize {
-        7
-    }
+impl<'a> TryFrom<&'a [u8]> for Header {
+    type Error = DecodeError;
 
-    pub fn encode(&self, buf: &mut [u8]) -> Result<usize, EncodeError> {
-        if Self::size() > buf.len() {
-            return Err(EncodeError::InvalidBufferSize);
-        }
-
-        buf[0..2].copy_from_slice(&self.transaction_id.to_be_bytes());
-        buf[2..4].copy_from_slice(&self.protocol_id.to_be_bytes());
-        buf[4..6].copy_from_slice(&self.length.to_be_bytes());
-        buf[6] = self.unit_id;
-
-        Ok(Self::size())
+    fn try_from(buf: &'a [u8]) -> Result<Self, Self::Error> {
+        Self::decode(buf)
     }
 }
