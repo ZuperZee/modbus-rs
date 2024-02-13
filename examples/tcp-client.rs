@@ -48,10 +48,6 @@ fn main() {
                 break;
             }
             Err(err) => match err {
-                DecodeError::EmptyBuffer => {
-                    println!("Empty buffer");
-                    continue;
-                }
                 DecodeError::IncompleteBuffer {
                     current_size,
                     min_needed_size,

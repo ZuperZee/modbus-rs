@@ -13,7 +13,6 @@ pub enum EncodeError {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum DecodeError {
-    EmptyBuffer,
     IncompleteBuffer {
         current_size: usize,
         min_needed_size: usize,

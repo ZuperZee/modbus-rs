@@ -103,7 +103,10 @@ impl<'a> Request<'a> {
 
     pub fn decode(buf: &'a [u8]) -> Result<Self, DecodeError> {
         if buf.is_empty() {
-            return Err(DecodeError::EmptyBuffer);
+            return Err(DecodeError::IncompleteBuffer {
+                current_size: 0,
+                min_needed_size: 1,
+            });
         }
 
         let fn_code: FunctionCode = buf[0].try_into().map_err(|c| {
@@ -343,7 +346,13 @@ mod test {
     #[test]
     fn request_from_buffer() {
         let buf: &[u8] = &[];
-        assert_eq!(Request::try_from(buf), Err(DecodeError::EmptyBuffer));
+        assert_eq!(
+            Request::try_from(buf),
+            Err(DecodeError::IncompleteBuffer {
+                current_size: 0,
+                min_needed_size: 1,
+            })
+        );
 
         let buf: &[u8] = &[0x81, 0x01];
         assert_eq!(

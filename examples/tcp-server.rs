@@ -79,10 +79,6 @@ fn handle_connection(mut stream: TcpStream) {
         let pdu_req = match PduRequest::try_from(req_pdu_buf) {
             Ok(req) => req,
             Err(err) => match err {
-                DecodeError::EmptyBuffer => {
-                    println!("Empty buffer");
-                    continue;
-                }
                 DecodeError::IncompleteBuffer {
                     current_size,
                     min_needed_size,
