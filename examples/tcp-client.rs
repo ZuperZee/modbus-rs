@@ -30,19 +30,20 @@ fn main() {
     stream.write_all(&req_buf).unwrap();
     stream.flush().unwrap();
 
-    let mut res_buf: Vec<u8> = vec![];
+    let mut tmp_res_buf: [u8; 300] = [0; 300];
+    let mut buf_pos = 0;
     loop {
-        let mut tmp_res_buf: [u8; 300] = [0; 300];
-        let bytes_read = stream.read(&mut tmp_res_buf).unwrap();
+        let bytes_read = stream.read(&mut tmp_res_buf[buf_pos..]).unwrap();
         println!("{} bytes were received", bytes_read);
         if bytes_read == 0 {
             println!("EOF");
             break;
         };
-        res_buf.extend_from_slice(&tmp_res_buf[..bytes_read]);
+        buf_pos += bytes_read;
+        let res_buf = &tmp_res_buf[..buf_pos];
         println!("res_buf: {:?}", res_buf);
 
-        match AduResponse::try_from(res_buf.as_slice()) {
+        match AduResponse::try_from(res_buf) {
             Ok(res) => {
                 println!("{:?}", res);
                 break;
