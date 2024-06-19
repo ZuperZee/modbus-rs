@@ -62,16 +62,16 @@ fn handle_connection(mut stream: TcpStream) {
         let (req_header_buf, req_pdu_buf) = req_buf.split_at(Header::size());
 
         let header = Header::try_from(req_header_buf).unwrap();
-        if header.unit_id == 111 {
+        if *header.unit_id() == 111 {
             // Disallow unit_id 111. Hopefully no one got screwed by disallowing 111 xD
             // Can be changed to only allow unit_id 1 or something (header.unit_id != 1).
             // This is more for showing where to put the check.
             return;
         }
 
-        if header.length as usize > req_pdu_buf.len() + 1 {
+        if *header.length() as usize > req_pdu_buf.len() + 1 {
             let current_size = req_buf.len();
-            let min_needed_size = header.length as usize + Header::size() - 1;
+            let min_needed_size = *header.length() as usize + Header::size() - 1;
             println!("Incomplete buffer: {}/{}", current_size, min_needed_size);
             continue;
         };
@@ -100,23 +100,24 @@ fn handle_connection(mut stream: TcpStream) {
             },
         };
 
-        let req = AduRequest::new(header.transaction_id, header.unit_id, pdu_req);
+        let req = AduRequest::new(*header.transaction_id(), *header.unit_id(), pdu_req);
         println!("{:?}", req);
 
-        let pdu_res = match req.pdu {
-            PduRequest::ReadInputRegisters(_, _) => {
-                Ok(PduResponse::ReadInputRegisters(DataWords {
-                    data: &[0x01, 0x02],
-                    quantity: 1,
-                }))
-            }
-            _ => Err(PduExceptionResponse {
-                function_code: FunctionCode::from(&req.pdu),
-                exception_code: ExceptionCode::IllegalFunction,
-            }),
+        let pdu_res = match req.pdu() {
+            PduRequest::ReadInputRegisters(_, _) => Ok(PduResponse::ReadInputRegisters(
+                DataWords::new(&[0x01, 0x02], 1),
+            )),
+            _ => Err(PduExceptionResponse::new(
+                FunctionCode::from(req.pdu()),
+                ExceptionCode::IllegalFunction,
+            )),
         };
 
-        let res = AduResponse::new(req.header.transaction_id, req.header.unit_id, pdu_res);
+        let res = AduResponse::new(
+            *req.header().transaction_id(),
+            *req.header().unit_id(),
+            pdu_res,
+        );
         println!("{:?}", res);
         let mut res_buf = vec![0; res.adu_len()];
         let size = res.encode(&mut res_buf).unwrap();

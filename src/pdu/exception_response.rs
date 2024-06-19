@@ -4,11 +4,18 @@ use super::function_code::FunctionCode;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ExceptionResponse {
-    pub function_code: FunctionCode,
-    pub exception_code: ExceptionCode,
+    function_code: FunctionCode,
+    exception_code: ExceptionCode,
 }
 
 impl ExceptionResponse {
+    pub fn new(function_code: FunctionCode, exception_code: ExceptionCode) -> Self {
+        Self {
+            function_code,
+            exception_code,
+        }
+    }
+
     pub fn pdu_len(&self) -> usize {
         2
     }

@@ -2,10 +2,10 @@ use crate::error::{DecodeError, EncodeError};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Header {
-    pub transaction_id: u16,
-    pub protocol_id: u16,
-    pub length: u16,
-    pub unit_id: u8,
+    transaction_id: u16,
+    protocol_id: u16,
+    length: u16,
+    unit_id: u8,
 }
 
 impl Header {
@@ -16,6 +16,19 @@ impl Header {
             length,
             unit_id,
         }
+    }
+
+    pub fn transaction_id(&self) -> &u16 {
+        &self.transaction_id
+    }
+    pub fn protocol_id(&self) -> &u16 {
+        &self.protocol_id
+    }
+    pub fn length(&self) -> &u16 {
+        &self.length
+    }
+    pub fn unit_id(&self) -> &u8 {
+        &self.unit_id
     }
 
     pub const fn size() -> usize {

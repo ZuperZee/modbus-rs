@@ -1,7 +1,7 @@
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct DataCoils<'a> {
-    pub data: &'a [u8],
-    pub quantity: usize,
+    data: &'a [u8],
+    quantity: usize,
 }
 
 impl<'a, 'b> DataCoils<'a> {
@@ -24,6 +24,13 @@ impl<'a, 'b> DataCoils<'a> {
             data: &buf[..data_len],
             quantity: coils.len(),
         }
+    }
+
+    pub fn data(&self) -> &'a [u8] {
+        self.data
+    }
+    pub fn quantity(&self) -> usize {
+        self.quantity
     }
 
     pub fn coils_len(&self) -> usize {

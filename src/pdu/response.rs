@@ -25,10 +25,12 @@ pub enum Response<'a> {
 impl<'a> Response<'a> {
     pub fn pdu_len(&self) -> usize {
         match &self {
-            Response::ReadCoils(coils) | Response::ReadDiscreteInput(coils) => 2 + coils.data.len(),
+            Response::ReadCoils(coils) | Response::ReadDiscreteInput(coils) => {
+                2 + coils.data().len()
+            }
             Response::ReadHoldingRegisters(words)
             | Response::ReadInputRegisters(words)
-            | Response::ReadWriteMultipleRegisters(words) => 2 + words.data.len(),
+            | Response::ReadWriteMultipleRegisters(words) => 2 + words.data().len(),
             Response::WriteSingleCoil(_, _)
             | Response::WriteSingleRegister(_, _)
             | Response::WriteMultipleCoils(_, _)
@@ -47,14 +49,14 @@ impl<'a> Response<'a> {
 
         match &self {
             Response::ReadCoils(coils) | Response::ReadDiscreteInput(coils) => {
-                buf[1] = coils.data.len() as u8;
-                buf[2..2 + coils.data.len()].copy_from_slice(coils.data);
+                buf[1] = coils.data().len() as u8;
+                buf[2..2 + coils.data().len()].copy_from_slice(coils.data());
             }
             Response::ReadHoldingRegisters(words)
             | Response::ReadInputRegisters(words)
             | Response::ReadWriteMultipleRegisters(words) => {
-                buf[1] = words.data.len() as u8;
-                buf[2..2 + words.data.len()].copy_from_slice(words.data);
+                buf[1] = words.data().len() as u8;
+                buf[2..2 + words.data().len()].copy_from_slice(words.data());
             }
             Response::WriteSingleCoil(address, coil) => {
                 buf[1..3].copy_from_slice(&address.to_be_bytes());
@@ -118,9 +120,9 @@ impl<'a> Response<'a> {
                 let data = &buf[2..byte_count + 2];
                 let quantity = byte_count * 8;
                 match fn_code {
-                    FunctionCode::ReadCoils => Response::ReadCoils(DataCoils { data, quantity }),
+                    FunctionCode::ReadCoils => Response::ReadCoils(DataCoils::new(data, quantity)),
                     FunctionCode::ReadDiscreteInput => {
-                        Response::ReadDiscreteInput(DataCoils { data, quantity })
+                        Response::ReadDiscreteInput(DataCoils::new(data, quantity))
                     }
                     _ => unreachable!(),
                 }
@@ -144,13 +146,13 @@ impl<'a> Response<'a> {
                 let quantity = byte_count / 2;
                 match fn_code {
                     FunctionCode::ReadHoldingRegisters => {
-                        Response::ReadHoldingRegisters(DataWords { data, quantity })
+                        Response::ReadHoldingRegisters(DataWords::new(data, quantity))
                     }
                     FunctionCode::ReadInputRegisters => {
-                        Response::ReadInputRegisters(DataWords { data, quantity })
+                        Response::ReadInputRegisters(DataWords::new(data, quantity))
                     }
                     FunctionCode::ReadWriteMultipleRegisters => {
-                        Response::ReadWriteMultipleRegisters(DataWords { data, quantity })
+                        Response::ReadWriteMultipleRegisters(DataWords::new(data, quantity))
                     }
                     _ => unreachable!(),
                 }
@@ -275,34 +277,31 @@ mod test {
         let buf: &[u8] = &[0x01, 0x02, 0xff, 0x7f];
         assert_eq!(
             Response::try_from(buf),
-            Ok(Response::ReadCoils(DataCoils {
-                data: &[0xff, 0x7f],
-                quantity: 16
-            }))
+            Ok(Response::ReadCoils(DataCoils::new(&[0xff, 0x7f], 16)))
         );
         let buf: &[u8] = &[0x02, 0x02, 0xff, 0x7f];
         assert_eq!(
             Response::try_from(buf),
-            Ok(Response::ReadDiscreteInput(DataCoils {
-                data: &[0xff, 0x7f],
-                quantity: 16
-            }))
+            Ok(Response::ReadDiscreteInput(DataCoils::new(
+                &[0xff, 0x7f],
+                16
+            )))
         );
         let buf: &[u8] = &[0x03, 0x04, 0x00, 0x11, 0x00, 0x04];
         assert_eq!(
             Response::try_from(buf),
-            Ok(Response::ReadHoldingRegisters(DataWords {
-                data: &[0x00, 0x11, 0x00, 0x04],
-                quantity: 2
-            }))
+            Ok(Response::ReadHoldingRegisters(DataWords::new(
+                &[0x00, 0x11, 0x00, 0x04],
+                2
+            )))
         );
         let buf: &[u8] = &[0x04, 0x04, 0x00, 0x11, 0x00, 0x04];
         assert_eq!(
             Response::try_from(buf),
-            Ok(Response::ReadInputRegisters(DataWords {
-                data: &[0x00, 0x11, 0x00, 0x04],
-                quantity: 2
-            }))
+            Ok(Response::ReadInputRegisters(DataWords::new(
+                &[0x00, 0x11, 0x00, 0x04],
+                2
+            )))
         );
     }
 
@@ -368,10 +367,7 @@ mod test {
 
     #[test]
     fn buffer_from_response() {
-        let res = Response::ReadCoils(DataCoils {
-            data: &[0xff, 0x7f],
-            quantity: 16,
-        });
+        let res = Response::ReadCoils(DataCoils::new(&[0xff, 0x7f], 16));
         let buf: &mut [u8] = &mut [0; 4];
         let pdu_len = res.encode(buf);
         assert_eq!(pdu_len, Ok(4));
@@ -383,10 +379,7 @@ mod test {
     fn vec_buffer_from_response() {
         extern crate alloc;
         use alloc::vec;
-        let res = Response::ReadCoils(DataCoils {
-            data: &[0xff, 0x7f],
-            quantity: 16,
-        });
+        let res = Response::ReadCoils(DataCoils::new(&[0xff, 0x7f], 16));
         let size = res.pdu_len();
         let mut buf = vec![0; size];
         let pdu_len = res.encode(&mut buf);

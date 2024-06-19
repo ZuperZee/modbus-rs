@@ -32,10 +32,10 @@ impl<'a> Request<'a> {
             | Request::ReadInputRegisters(_, _)
             | Request::WriteSingleCoil(_, _)
             | Request::WriteSingleRegister(_, _) => 5,
-            Request::WriteMultipleCoils(_, coils) => 6 + coils.data.len(),
-            Request::WriteMultipleRegisters(_, words) => 6 + words.data.len(),
+            Request::WriteMultipleCoils(_, coils) => 6 + coils.data().len(),
+            Request::WriteMultipleRegisters(_, words) => 6 + words.data().len(),
             Request::MaskWriteRegister(_, _, _) => 7,
-            Request::ReadWriteMultipleRegisters(_, _, _, words) => 10 + words.data.len(),
+            Request::ReadWriteMultipleRegisters(_, _, _, words) => 10 + words.data().len(),
             Request::Custom(_, d) => 1 + d.len(),
         }
     }
@@ -66,15 +66,15 @@ impl<'a> Request<'a> {
             }
             Request::WriteMultipleCoils(address, coils) => {
                 buf[1..3].copy_from_slice(&address.to_be_bytes());
-                buf[3..5].copy_from_slice(&coils.quantity.to_be_bytes());
-                buf[5] = coils.data.len() as u8;
-                buf[6..coils.data.len() + 6].copy_from_slice(coils.data);
+                buf[3..5].copy_from_slice(&coils.quantity().to_be_bytes());
+                buf[5] = coils.data().len() as u8;
+                buf[6..coils.data().len() + 6].copy_from_slice(coils.data());
             }
             Request::WriteMultipleRegisters(address, words) => {
                 buf[1..3].copy_from_slice(&address.to_be_bytes());
-                buf[3..5].copy_from_slice(&words.quantity.to_be_bytes());
-                buf[5] = words.data.len() as u8;
-                buf[6..words.data.len() + 6].copy_from_slice(words.data);
+                buf[3..5].copy_from_slice(&words.quantity().to_be_bytes());
+                buf[5] = words.data().len() as u8;
+                buf[6..words.data().len() + 6].copy_from_slice(words.data());
             }
             Request::MaskWriteRegister(address, and_mask, or_mask) => {
                 buf[1..3].copy_from_slice(&address.to_be_bytes());
@@ -90,8 +90,8 @@ impl<'a> Request<'a> {
                 buf[1..3].copy_from_slice(&read_address.to_be_bytes());
                 buf[3..5].copy_from_slice(&read_quantity.to_be_bytes());
                 buf[5..7].copy_from_slice(&write_address.to_be_bytes());
-                buf[7..9].copy_from_slice(&write_words.quantity.to_be_bytes());
-                buf[9..write_words.data.len() + 9].copy_from_slice(write_words.data);
+                buf[7..9].copy_from_slice(&write_words.quantity().to_be_bytes());
+                buf[9..write_words.data().len() + 9].copy_from_slice(write_words.data());
             }
             Request::Custom(_, data) => {
                 buf[1..1 + data.len()].copy_from_slice(data);
@@ -226,13 +226,7 @@ impl<'a> Request<'a> {
                     });
                 }
                 let data = &buf[6..byte_count + 6];
-                Request::WriteMultipleCoils(
-                    address,
-                    DataCoils {
-                        data,
-                        quantity: quantity as usize,
-                    },
-                )
+                Request::WriteMultipleCoils(address, DataCoils::new(data, quantity as usize))
             }
             FunctionCode::WriteMultipleRegisters => {
                 if 6 > buf.len() {
@@ -257,13 +251,7 @@ impl<'a> Request<'a> {
                     });
                 }
                 let data = &buf[6..byte_count + 6];
-                Request::WriteMultipleRegisters(
-                    address,
-                    DataWords {
-                        data,
-                        quantity: quantity as usize,
-                    },
-                )
+                Request::WriteMultipleRegisters(address, DataWords::new(data, quantity as usize))
             }
             FunctionCode::MaskWriteRegister => {
                 if 7 > buf.len() {
@@ -312,10 +300,7 @@ impl<'a> Request<'a> {
                     read_address,
                     read_quantity,
                     write_address,
-                    DataWords {
-                        data,
-                        quantity: write_quantity as usize,
-                    },
+                    DataWords::new(data, write_quantity as usize),
                 )
             }
             FunctionCode::Custom(_) => Request::Custom(fn_code, &buf[1..]),
@@ -387,10 +372,7 @@ mod test {
             Request::try_from(buf),
             Ok(Request::WriteMultipleCoils(
                 0x13,
-                DataCoils {
-                    data: &[0xcd, 0x01],
-                    quantity: 0x0a
-                }
+                DataCoils::new(&[0xcd, 0x01], 0x0a)
             ))
         );
     }

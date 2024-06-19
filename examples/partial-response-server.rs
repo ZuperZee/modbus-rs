@@ -34,10 +34,7 @@ fn handle_connection(mut stream: TcpStream) {
     AduResponse::new(
         1,
         1,
-        Ok(PduResponse::ReadInputRegisters(DataWords {
-            data: &[1, 2],
-            quantity: 2,
-        })),
+        Ok(PduResponse::ReadInputRegisters(DataWords::new(&[1, 2], 2))),
     )
     .encode(&mut buf)
     .unwrap();

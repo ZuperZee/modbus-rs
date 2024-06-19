@@ -1,12 +1,19 @@
 #[derive(Debug, PartialEq, Eq)]
 pub struct DataWords<'a> {
-    pub data: &'a [u8],
-    pub quantity: usize,
+    data: &'a [u8],
+    quantity: usize,
 }
 
 impl<'a, 'b> DataWords<'a> {
     pub fn new(data: &'a [u8], quantity: usize) -> Self {
         Self { data, quantity }
+    }
+
+    pub fn data(&self) -> &'a [u8] {
+        self.data
+    }
+    pub fn quantity(&self) -> usize {
+        self.quantity
     }
 
     pub fn from_words(words: &'b [u16], buf: &'a mut [u8]) -> Self {

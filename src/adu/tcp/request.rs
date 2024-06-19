@@ -4,8 +4,8 @@ use super::header::Header;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Request<'a> {
-    pub header: Header,
-    pub pdu: PduRequest<'a>,
+    header: Header,
+    pdu: PduRequest<'a>,
 }
 
 impl<'a> Request<'a> {
@@ -14,6 +14,13 @@ impl<'a> Request<'a> {
             header: Header::new(transaction_id, (pdu_req.pdu_len() + 1) as u16, unit_id),
             pdu: pdu_req,
         }
+    }
+
+    pub fn header(&self) -> &Header {
+        &self.header
+    }
+    pub fn pdu(&self) -> &PduRequest<'a> {
+        &self.pdu
     }
 
     pub fn pdu_len(&self) -> usize {

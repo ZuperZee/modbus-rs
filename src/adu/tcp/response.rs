@@ -7,8 +7,8 @@ use super::header::Header;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Response<'a> {
-    pub header: Header,
-    pub pdu: Result<PduResponse<'a>, ExceptionResponse>,
+    header: Header,
+    pdu: Result<PduResponse<'a>, ExceptionResponse>,
 }
 
 impl<'a> Response<'a> {
@@ -27,6 +27,14 @@ impl<'a> Response<'a> {
             pdu: pdu_res,
         }
     }
+
+    pub fn header(&self) -> &Header {
+        &self.header
+    }
+    pub fn pdu(&self) -> &Result<PduResponse<'a>, ExceptionResponse> {
+        &self.pdu
+    }
+
     pub fn pdu_len(&self) -> usize {
         match &self.pdu {
             Ok(pdu) => pdu.pdu_len(),
@@ -65,12 +73,12 @@ impl<'a> Response<'a> {
         let (header_buf, pdu_buf) = buf.split_at(Header::size());
 
         let header = Header::try_from(header_buf)?;
-        if header.length as usize > pdu_buf.len() + 1 {
+        if *header.length() as usize > pdu_buf.len() + 1 {
             return Err(DecodeError::IncompleteBuffer {
                 current_size: buf.len(),
                 // unit_id is included in the header.length and header.size
                 // so we need to subtract 1
-                min_needed_size: header.length as usize + Header::size() - 1,
+                min_needed_size: *header.length() as usize + Header::size() - 1,
             });
         };
 
@@ -100,6 +108,15 @@ impl<'a> TryFrom<&'a [u8]> for Response<'a> {
     }
 }
 
+impl<'a> From<(Header, Result<PduResponse<'a>, ExceptionResponse>)> for Response<'a> {
+    fn from(value: (Header, Result<PduResponse<'a>, ExceptionResponse>)) -> Self {
+        Self {
+            header: value.0,
+            pdu: value.1,
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::pdu::DataWords;
@@ -112,16 +129,11 @@ mod test {
         assert_eq!(
             Response::try_from(buf),
             Ok(Response {
-                header: Header {
-                    transaction_id: 1,
-                    protocol_id: 0,
-                    length: 13,
-                    unit_id: 1,
-                },
-                pdu: Ok(PduResponse::ReadInputRegisters(DataWords {
-                    data: &[0, 1, 0, 2, 0, 3, 0, 4, 0, 5],
-                    quantity: 5
-                }))
+                header: Header::new(1, 13, 1),
+                pdu: Ok(PduResponse::ReadInputRegisters(DataWords::new(
+                    &[0, 1, 0, 2, 0, 3, 0, 4, 0, 5],
+                    5
+                )))
             })
         );
     }
@@ -129,16 +141,11 @@ mod test {
     #[test]
     fn buffer_from_response() {
         let res = Response {
-            header: Header {
-                transaction_id: 1,
-                protocol_id: 0,
-                length: 13,
-                unit_id: 1,
-            },
-            pdu: Ok(PduResponse::ReadInputRegisters(DataWords {
-                data: &[0, 1, 0, 2, 0, 3, 0, 4, 0, 5],
-                quantity: 5,
-            })),
+            header: Header::new(1, 13, 1),
+            pdu: Ok(PduResponse::ReadInputRegisters(DataWords::new(
+                &[0, 1, 0, 2, 0, 3, 0, 4, 0, 5],
+                5,
+            ))),
         };
         let buf = &mut [0_u8; 19];
         let adu_len = res.encode(buf);
