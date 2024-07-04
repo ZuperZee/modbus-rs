@@ -4,7 +4,7 @@ pub struct DataWords<'a> {
     quantity: usize,
 }
 
-impl<'a, 'b> DataWords<'a> {
+impl<'a> DataWords<'a> {
     pub fn new(data: &'a [u8], quantity: usize) -> Self {
         Self { data, quantity }
     }
@@ -16,7 +16,7 @@ impl<'a, 'b> DataWords<'a> {
         self.quantity
     }
 
-    pub fn from_words(words: &'b [u16], buf: &'a mut [u8]) -> Self {
+    pub fn from_words(words: &[u16], buf: &'a mut [u8]) -> Self {
         let data_len = words.len() * 2;
 
         for (i, word) in words.iter().enumerate() {
@@ -30,7 +30,9 @@ impl<'a, 'b> DataWords<'a> {
             quantity: words.len(),
         }
     }
+}
 
+impl<'a, 'b> DataWords<'a> {
     pub fn copy_words_to(&self, words: &'b mut [u16]) -> &'b [u16] {
         for (i, word) in words.iter_mut().enumerate().take(self.quantity) {
             let high = self.data[i * 2];

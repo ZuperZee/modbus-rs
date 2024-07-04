@@ -4,12 +4,12 @@ pub struct DataCoils<'a> {
     quantity: usize,
 }
 
-impl<'a, 'b> DataCoils<'a> {
+impl<'a> DataCoils<'a> {
     pub fn new(data: &'a [u8], quantity: usize) -> Self {
         Self { data, quantity }
     }
 
-    pub fn from_coils(coils: &'b [bool], buf: &'a mut [u8]) -> Self {
+    pub fn from_coils(coils: &[bool], buf: &'a mut [u8]) -> Self {
         for (i, bits) in coils.chunks(8).enumerate() {
             let mut byte: u8 = 0;
             for (j, &bit) in bits.iter().enumerate() {
@@ -40,7 +40,9 @@ impl<'a, 'b> DataCoils<'a> {
     pub fn data_len(&self) -> usize {
         self.data.len()
     }
+}
 
+impl<'a, 'b> DataCoils<'a> {
     pub fn copy_coils_to(&self, coils: &'b mut [bool]) -> &'b [bool] {
         for (i, coil) in coils.iter_mut().enumerate().take(self.quantity) {
             let byte = self.data[i / 8];
