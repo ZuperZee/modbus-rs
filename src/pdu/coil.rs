@@ -60,7 +60,7 @@ extern crate alloc;
 use alloc::vec::Vec;
 #[cfg(feature = "alloc")]
 impl From<DataCoils<'_>> for Vec<bool> {
-    fn from(data_coils: DataCoils) -> Self {
+    fn from(data_coils: DataCoils<'_>) -> Self {
         Vec::from_iter((0..data_coils.quantity).map(|i| {
             let byte = data_coils.data[i / 8];
             let bit_pos = i % 8;

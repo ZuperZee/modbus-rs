@@ -50,7 +50,7 @@ extern crate alloc;
 use alloc::vec::Vec;
 #[cfg(feature = "alloc")]
 impl From<DataWords<'_>> for Vec<u16> {
-    fn from(data_words: DataWords) -> Self {
+    fn from(data_words: DataWords<'_>) -> Self {
         Vec::from_iter((0..data_words.quantity).map(|i| {
             let high = data_words.data[i * 2];
             let low = data_words.data[i * 2 + 1];

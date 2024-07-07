@@ -57,7 +57,7 @@ impl From<FunctionCode> for u8 {
 }
 
 impl<'a> From<&PduResponse<'a>> for FunctionCode {
-    fn from(value: &PduResponse) -> Self {
+    fn from(value: &PduResponse<'a>) -> Self {
         match value {
             PduResponse::ReadCoils(_) => FunctionCode::ReadCoils,
             PduResponse::ReadDiscreteInput(_) => FunctionCode::ReadDiscreteInput,
@@ -75,7 +75,7 @@ impl<'a> From<&PduResponse<'a>> for FunctionCode {
 }
 
 impl<'a> From<&PduRequest<'a>> for FunctionCode {
-    fn from(value: &PduRequest) -> Self {
+    fn from(value: &PduRequest<'a>) -> Self {
         match value {
             PduRequest::ReadCoils(_, _) => FunctionCode::ReadCoils,
             PduRequest::ReadDiscreteInput(_, _) => FunctionCode::ReadDiscreteInput,
