@@ -16,5 +16,5 @@ fn main() {
     let mut res_buf: [u8; 300] = [0; 300];
     let bytes_read = stream.read(&mut res_buf).unwrap();
     println!("{:?}", &res_buf[..bytes_read]);
-    println!("{:?}", bytes_read);
+    println!("{bytes_read:?}");
 }

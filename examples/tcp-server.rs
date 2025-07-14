@@ -17,7 +17,7 @@ use modbus::{
 fn main() {
     let socket_addr = "localhost:5502";
     let listener = TcpListener::bind(socket_addr).unwrap();
-    println!("Modbus server listening on {}", socket_addr);
+    println!("Modbus server listening on {socket_addr}");
 
     for stream in listener.incoming() {
         match stream {
@@ -25,7 +25,7 @@ fn main() {
                 thread::spawn(|| handle_connection(stream));
             }
             Err(e) => {
-                eprintln!("Failed creating a connection with error: {}", e)
+                eprintln!("Failed creating a connection with error: {e}")
             }
         }
     }
@@ -40,23 +40,23 @@ fn handle_connection(mut stream: TcpStream) {
         let bytes_read = match stream.read(&mut tmp_req_buf) {
             Ok(bytes_read) => bytes_read,
             Err(err) => {
-                eprintln!("Failed reading stream with error: {}", err);
+                eprintln!("Failed reading stream with error: {err}");
                 return;
             }
         };
-        println!("{} bytes were received", bytes_read);
+        println!("{bytes_read} bytes were received");
 
         if bytes_read == 0 {
             println!("EOF");
             return;
         }
         req_buf.extend_from_slice(&tmp_req_buf[..bytes_read]);
-        println!("req_buf: {:?}", req_buf);
+        println!("req_buf: {req_buf:?}");
 
         if req_buf.len() < Header::size() {
             let current_size = req_buf.len();
             let min_needed_size = Header::size();
-            println!("Incomplete buffer: {}/{}", current_size, min_needed_size);
+            println!("Incomplete buffer: {current_size}/{min_needed_size}");
             continue;
         };
         let (req_header_buf, req_pdu_buf) = req_buf.split_at(Header::size());
@@ -72,7 +72,7 @@ fn handle_connection(mut stream: TcpStream) {
         if *header.length() as usize > req_pdu_buf.len() + 1 {
             let current_size = req_buf.len();
             let min_needed_size = *header.length() as usize + Header::size() - 1;
-            println!("Incomplete buffer: {}/{}", current_size, min_needed_size);
+            println!("Incomplete buffer: {current_size}/{min_needed_size}");
             continue;
         };
 
@@ -83,25 +83,24 @@ fn handle_connection(mut stream: TcpStream) {
                     current_size,
                     min_needed_size,
                 } => {
-                    println!("Incomplete buffer: {}/{}", current_size, min_needed_size);
+                    println!("Incomplete buffer: {current_size}/{min_needed_size}");
                     continue;
                 }
                 DecodeError::ModbusExceptionError(fn_code, exception_error) => {
                     println!(
-                        "Modbus exception error: {:?} {:?}",
-                        fn_code, exception_error
+                        "Modbus exception error: {fn_code:?} {exception_error:?}"
                     );
                     break;
                 }
                 DecodeError::ModbusExceptionCode(fn_code, exception_code) => {
-                    println!("Modbus exception code: {:?} {:?}", fn_code, exception_code);
+                    println!("Modbus exception code: {fn_code:?} {exception_code:?}");
                     break;
                 }
             },
         };
 
         let req = AduRequest::new(*header.transaction_id(), *header.unit_id(), pdu_req);
-        println!("{:?}", req);
+        println!("{req:?}");
 
         let pdu_res = match req.pdu() {
             PduRequest::ReadInputRegisters(_, _) => Ok(PduResponse::ReadInputRegisters(
@@ -118,11 +117,11 @@ fn handle_connection(mut stream: TcpStream) {
             *req.header().unit_id(),
             pdu_res,
         );
-        println!("{:?}", res);
+        println!("{res:?}");
         let mut res_buf = vec![0; res.adu_len()];
         let size = res.encode(&mut res_buf).unwrap();
-        println!("res_buf: {:?}", res_buf);
-        println!("{:?}", size);
+        println!("res_buf: {res_buf:?}");
+        println!("{size:?}");
 
         let _ = stream.write_all(&res_buf);
     }

@@ -13,7 +13,7 @@ use modbus::{
 fn main() {
     let socket_addr = "localhost:5502";
     let listener = TcpListener::bind(socket_addr).unwrap();
-    println!("Modbus server listening on {}", socket_addr);
+    println!("Modbus server listening on {socket_addr}");
 
     for stream in listener.incoming() {
         match stream {
@@ -21,7 +21,7 @@ fn main() {
                 thread::spawn(|| handle_connection(stream));
             }
             Err(e) => {
-                eprintln!("Failed creating a connection with error: {}", e)
+                eprintln!("Failed creating a connection with error: {e}")
             }
         }
     }
@@ -41,7 +41,7 @@ fn handle_connection(mut stream: TcpStream) {
 
     for b in buf.chunks(1) {
         thread::sleep(Duration::from_millis(100));
-        println!("Writing {:?}", b);
+        println!("Writing {b:?}");
         stream.write_all(b).unwrap();
     }
 }
