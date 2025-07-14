@@ -18,7 +18,7 @@ impl<'a> DataCoils<'a> {
             buf[i] = byte;
         }
 
-        let data_len = (coils.len() + 7) / 8;
+        let data_len = coils.len().div_ceil(8);
 
         Self {
             data: &buf[..data_len],
